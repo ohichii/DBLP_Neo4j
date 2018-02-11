@@ -1,11 +1,12 @@
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.Scanner;
+import java.util.LinkedList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+//import java.util.Scanner;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
@@ -47,28 +48,38 @@ public class ConfigHandler extends DefaultHandler {
     boolean seenSchoolStartElem = false;
     boolean seenChapterStartElem = false;
     boolean seenAddressStartElem = false;
+    boolean write = false;
 
     int elementCnt = 0;
     int pubCnt = 0;
+
+    LinkedList<String> keys;
+
+    @Override
+    public void startDocument()
+            throws SAXException {
+
+        BufferedReader br = null;
+        try {
+            br = new BufferedReader(new FileReader(new File("pubEvaluation.csv")));
+            keys = new LinkedList<>();
+            String availalbe;
+            while ((availalbe = br.readLine()) != null) {
+                String[] parts = availalbe.split(";");
+                keys.add(parts[1]);
+            }
+            br.close();
+        } catch (Exception ex) {
+            Logger.getLogger(ConfigHandler1.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+    }
 
     @Override
     public void endDocument() throws SAXException {
 
         new Neo4jCreator(entityMap);
         super.endDocument();
-    }
-
-    public boolean contains(File file, String s) throws FileNotFoundException, IOException {
-        BufferedReader br = new BufferedReader(new FileReader(file));
-        String line;
-        while ((line = br.readLine()) != null) {
-            if (line.contains(";" + s + ";")) {
-                br.close();
-                return true;
-            }
-        }
-        br.close();
-        return false;
     }
 
     public void startElement(String uri, String localName, String qName, Attributes attributes)
@@ -83,29 +94,30 @@ public class ConfigHandler extends DefaultHandler {
             try {
                 String key = attributes.getValue("key");
                 // CHECK if this key in the Evaluation Dataset
-                //if (contains(new File("pubEvaluation.csv"), key) && pubCnt < 30352) {
-                System.out.println(pubCnt++);
-                // TODO: check if this key already exists
-                seenFirstAuthor = false;
+                if (keys.contains(key) && pubCnt < 30352) {
+                    write = true;
+                    System.out.println(pubCnt++);
+                    // check if this key already exists
+                    seenFirstAuthor = false;
 
-                if (entityMap.get(key) != null) {
-                    System.err.println("duplicate key! " + key);
+                    if (entityMap.get(key) != null) {
+                        System.err.println("duplicate key! " + key);
+                    }
+                    Element entity = new Element();
+                    entity.key = key;
+                    prevItemLevel2Key = key;
+                    entity.type = qName;
+                    try {
+                        entity.mdate = attributes.getValue("mdate");
+                    } catch (Exception exc) {
+                    }
+                    entityMap.put(key, entity);
+                    System.out.println(key);
                 }
-                Element entity = new Element();
-                entity.key = key;
-                prevItemLevel2Key = key;
-                entity.type = qName;
-                try {
-                    entity.mdate = attributes.getValue("mdate");
-                } catch (Exception exc) {
-                }
-                entityMap.put(key, entity);
-                System.out.println(key);
-                //}
             } catch (Exception exc) {
                 System.err.println("no key for item in level 2 is found!");
             }
-        } else if (level == 3) {
+        } else if (level == 3 && write) {
             if (null != qName) {
                 switch (qName) {
                     case "author":
@@ -186,11 +198,14 @@ public class ConfigHandler extends DefaultHandler {
     @Override
     public void endElement(String uri, String localName, String qName) throws SAXException {
         level--;
+        if (level == 1) {
+            write = false;
+        }
     }
 
     @Override
     public void characters(char ch[], int start, int length) throws SAXException {
-        if (entityMap.get(prevItemLevel2Key) != null) {
+        if (entityMap.get(prevItemLevel2Key) != null && write) {
             if (seenAuthorStartElem) {
                 if (!seenFirstAuthor) {
                     entityMap.get(prevItemLevel2Key).authors.add(new String(ch, start, length) + " FirstOrSomething");
@@ -265,8 +280,6 @@ public class ConfigHandler extends DefaultHandler {
                 seenSchoolStartElem = false;
             }
         }
-
-        // System.out.println(new String(ch, start, length));
     }
 
 }

@@ -10,18 +10,10 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.ResourceIterator;
-import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
-import org.neo4j.graphdb.Result;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
-import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.index.lucene.unsafe.batchinsert.LuceneBatchInserterIndexProvider;
-//import org.neo4j.tooling.GlobalGraphOperations;
-import org.neo4j.unsafe.batchinsert.BatchInserter;
-import org.neo4j.unsafe.batchinsert.BatchInserterIndex;
 import org.neo4j.unsafe.batchinsert.BatchInserterIndexProvider;
-import org.neo4j.unsafe.batchinsert.BatchInserters;
 
 public class Neo4jCreator {
 
@@ -50,7 +42,8 @@ public class Neo4jCreator {
         //db = BatchInserters.inserter("dblp2.db", config);
         //indexProvider = new LuceneBatchInserterIndexProvider(db);
         dbFactory = new GraphDatabaseFactory();
-        File dbFile = new File("/home/houhaich/Documents/neo4j-community-3.1.4/data/databases/graph.db");
+        File dbFile = new File("/home/azmah/Desktop/thesis_IRIT/neo4j-community-3.1.4/data/databases/graph.db");
+
         db = dbFactory.newEmbeddedDatabase(dbFile);
 
         db.execute("CREATE CONSTRAINT ON (y:Year) ASSERT y.value IS UNIQUE;");
@@ -88,7 +81,8 @@ public class Neo4jCreator {
         System.out.println("There are this number of distinct editors: " + distinctEditors.keySet().size());
         System.out.println("There are this number of entities: " + elementMap.keySet().size());
         // tx = db.beginTx();
-        try (Transaction tx = db.beginTx()) {
+        try  {
+            Transaction tx = db.beginTx();
             for (String author : distinctAuthors.keySet()) {
                 totalElement++;
 
@@ -132,7 +126,7 @@ public class Neo4jCreator {
 
                 distinctAuthors.put(author, nodeId);
                 nodeIdCreated.add(nodeId);
-                if ((totalElement % 50000) == 0) {
+                if ((totalElement % 1000) == 0) {
                     //index.flush();
                     tx.success();
                     System.out.println("authors: " + totalElement);
@@ -155,7 +149,7 @@ public class Neo4jCreator {
                 Long nodeId = node.getId();
                 nodeIdCreated.add(nodeId);
                 distinctEditors.put(editor, nodeId);
-                if ((totalElement % 50000) == 0) {
+                if ((totalElement % 1000) == 0) {
                     //index.flush();
                     tx.success();
                     System.out.println("editors: " + totalElement);
@@ -332,7 +326,7 @@ public class Neo4jCreator {
                     }
                 }
 
-                if ((totalElement % 50000) == 0) {
+                if ((totalElement % 1000) == 0) {
                     System.out.println("entities: " + totalElement);
                     //index.flush();
                     tx.success();
@@ -340,9 +334,9 @@ public class Neo4jCreator {
             }
             System.out.println("all nodes added!");
 
-            // insertIndex = 0;  
+            long totalElement1 = 0;
             for (String key : elementMap.keySet()) {
-                totalElement++;
+
                 Element element = elementMap.get(key);
                 for (String author : element.authors) {
                     //db.createRelationship(elementKeyNodeMap.get(key), distinctAuthors.get(author), RelTypes.WRITTEN_BY,null);
@@ -371,14 +365,18 @@ public class Neo4jCreator {
                     //db.createRelationship(elementKeyNodeMap.get(key), elementKeyNodeMap.get(element.publisher), RelTypes.PUBLISHED_IN, null);
                     db.getNodeById(elementKeyNodeMap.get(key)).createRelationshipTo(db.getNodeById(elementKeyNodeMap.get(element.publisher)), RelTypes.PUBLISHED_BY);
                 }
-                if ((totalElement % 50000) == 0) {
+                if ((totalElement1++ % 10000) == 0) {
                     //index.flush();
                     tx.success();
-                    System.out.println("relationship: " + totalElement);
+                    tx.close();
+                    tx = db.beginTx();
+                    System.out.println("relationship: " + totalElement1);
                 }
             }
 
             tx.success();
+        } catch (Exception e){
+            
         }
         System.out.println("all relationship added!");
 

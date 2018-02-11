@@ -12,14 +12,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
-import java.io.Writer;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Scanner;
-import org.neo4j.cypher.internal.ExecutionEngine;
-//import org.neo4j.cypher.ExecutionResult;
-import org.neo4j.graphdb.DynamicLabel;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
@@ -152,7 +147,6 @@ public class Disambiguation {
             File pubListFile = new File("pubEvaluation.csv");
 
             //ExecutionEngine engine = new ExecutionEngine(graphDb, StringLogger.SYSTEM);
-
             //Scanner in = new Scanner(pubListFile);
             BufferedReader brIn = new BufferedReader(new FileReader(pubListFile));
             int j = 0;
@@ -218,58 +212,57 @@ public class Disambiguation {
             //BufferedReader br = new BufferedReader(new FileReader(new File("outUniq2.csv")));
             //while ((line = br.readLine()) != null) {
             //    String nextName = line;
-                ResourceIterator<Node> nodes = db.findNodes(Disambiguation.NodeType.publication/*, "author", nextName*/);
+            ResourceIterator<Node> nodes = db.findNodes(Disambiguation.NodeType.publication/*, "author", nextName*/);
 
-                while (nodes.hasNext()) {
-                    Node n1 = nodes.next();
+            while (nodes.hasNext()) {
+                Node n1 = nodes.next();
 
-                    if (!n1.hasProperty("authorId")) {
-                        n1.setProperty("authorId", authorIdCounter);
-                    }
-                    int authorId = (int) n1.getProperty("authorId");
-                    //System.out.println("N11111 -->  " + n1.getProperty("author") + " --> " + n1.getProperty("authorId"));
+                if (!n1.hasProperty("authorId")) {
+                    n1.setProperty("authorId", authorIdCounter);
+                }
+                int authorId = (int) n1.getProperty("authorId");
+                //System.out.println("N11111 -->  " + n1.getProperty("author") + " --> " + n1.getProperty("authorId"));
 
-                    ResourceIterator<Node> nodes2 = db.findNodes(Disambiguation.NodeType.publication, "author", n1.getProperty("author"));
-                    while (nodes2.hasNext()) {
+                ResourceIterator<Node> nodes2 = db.findNodes(Disambiguation.NodeType.publication, "author", n1.getProperty("author"));
+                while (nodes2.hasNext()) {
 
-                        Node n2 = nodes2.next();
-                        String queryString = "OPTIONAL MATCH (n:publication { PId:{PId1} }),(m:publication { PId:{PId2}}), p = shortestPath((n)-[*..6]-(m))\n"
-                                + "RETURN length(p)";
-                        Map<String, Object> parameters = new HashMap<>();
-                        parameters.put("PId1", n1.getProperty("PId"));
-                        parameters.put("PId2", n2.getProperty("PId"));
+                    Node n2 = nodes2.next();
+                    String queryString = "OPTIONAL MATCH (n:publication { PId:{PId1} }),(m:publication { PId:{PId2}}), p = shortestPath((n)-[*..6]-(m))\n"
+                            + "RETURN length(p)";
+                    Map<String, Object> parameters = new HashMap<>();
+                    parameters.put("PId1", n1.getProperty("PId"));
+                    parameters.put("PId2", n2.getProperty("PId"));
 
-                        //System.out.println("N222222 -->  " + n2.getProperty("author"));
-
-                        Result result = db.execute(queryString, parameters);
-                        if (result.hasNext()) {
-                            Integer distance = (Integer) result.next().get("length(p)");
-                            //System.out.println(distance);
-                            if (distance != null && distance < 5) {
-                                //System.out.println("YES threshold");
-                                if (n2.hasProperty("authorId")) {
-                                    //System.out.println("YES authorId");
-                                    Integer i = (Integer) n2.getProperty("authorId");
-                                    if (i != authorId) {
-                                        ResourceIterator<Node> nodesToEdit = db.findNodes(Disambiguation.NodeType.publication, "authorId", i);
-                                        while (nodesToEdit.hasNext()) {
-                                            Node next = nodesToEdit.next();
-                                            next.setProperty("authorId", authorId);
-                                            //System.out.println("EDIT -->  " + next.getProperty("author") + " --> " + next.getProperty("authorId"));
-                                        }
+                    //System.out.println("N222222 -->  " + n2.getProperty("author"));
+                    Result result = db.execute(queryString, parameters);
+                    if (result.hasNext()) {
+                        Integer distance = (Integer) result.next().get("length(p)");
+                        //System.out.println(distance);
+                        if (distance != null && distance < 5) {
+                            //System.out.println("YES threshold");
+                            if (n2.hasProperty("authorId")) {
+                                //System.out.println("YES authorId");
+                                Integer i = (Integer) n2.getProperty("authorId");
+                                if (i != authorId) {
+                                    ResourceIterator<Node> nodesToEdit = db.findNodes(Disambiguation.NodeType.publication, "authorId", i);
+                                    while (nodesToEdit.hasNext()) {
+                                        Node next = nodesToEdit.next();
+                                        next.setProperty("authorId", authorId);
+                                        //System.out.println("EDIT -->  " + next.getProperty("author") + " --> " + next.getProperty("authorId"));
                                     }
-                                } else {
-                                    n2.setProperty("authorId", authorId);
                                 }
+                            } else {
+                                n2.setProperty("authorId", authorId);
                             }
                         }
                     }
-                    nodes2.close();
-                    System.out.println(++authorIdCounter);
-
                 }
+                nodes2.close();
+                System.out.println(++authorIdCounter);
+
+            }
             //}
-           // br.close();
+            // br.close();
             System.out.println("DISAMBIGUATION DONE !!");
             long end = System.currentTimeMillis();
             System.out.println(end - start);
@@ -286,47 +279,79 @@ public class Disambiguation {
             long start = System.currentTimeMillis();
             System.out.println("DISAMBIGUATION !!");
 
-            ResourceIterator<Node> nodes = db.findNodes(DynamicLabel.label("publication"));
+            ResourceIterator<Node> nodes = db.findNodes(Label.label("publication"));
 
             while (nodes.hasNext()) {
                 Node n1 = nodes.next();
                 //System.out.println("fffffffffffffffffffffffff");
                 if (n1.hasProperty("firstAuthor") && !n1.hasProperty("authorId")) {
                     n1.setProperty("authorId", authorId);
-                    //System.out.println("N11111 -->  " + n1.getProperty("firstAuthor") + " --> " + n1.getProperty("authorId"));
-                    //System.out.println("*******************************");
-                    ResourceIterator<Node> nodes2 = db.findNodes(DynamicLabel.label("publication"), "firstAuthor", n1.getProperty("firstAuthor"));
+                    // Find publications that have the same author name.
+                    ResourceIterator<Node> nodes2 = db.findNodes(Label.label("publication"), "firstAuthor", n1.getProperty("firstAuthor"));
                     while (nodes2.hasNext()) {
 
                         Node n2 = nodes2.next();
-                        String queryString = "OPTIONAL MATCH (n:publication { PId:{PId1} }),(m:publication { PId:{PId2}}), p = shortestPath((n)-[r:WRITTEN_BY *..6]-(m))\n"
-                                + "RETURN length(p)";
-                        Map<String, Object> parameters = new HashMap<>();
-                        parameters.put("PId1", n1.getProperty("PId"));
-                        parameters.put("PId2", n2.getProperty("PId"));
+                        if (n1.getId() != n2.getId()) {
+                            String query1 = "OPTIONAL MATCH (n:publication { PId:{PId1} }),(m:publication { PId:{PId2}}),"
+                                    + " p = shortestPath((n)-[r:WRITTEN_BY *..6]-(m))\n"
+                                    + "RETURN length(p)";
+                            String query2 = "OPTIONAL MATCH (n:publication { PId:{PId1} }),(m:publication { PId:{PId2}}),"
+                                    + " p = shortestPath((n)-[r:IN_JOURNAL *..3]-(m))\n"
+                                    + "RETURN length(p)";
+                            String query3 = "OPTIONAL MATCH (n:publication { PId:{PId1} }),(m:publication { PId:{PId2}}),"
+                                    + " p = shortestPath((n)-[r:IN_YEAR *..3]-(m))\n"
+                                    + "RETURN length(p)";
+                            Map<String, Object> parameters = new HashMap<>();
+                            parameters.put("PId1", n1.getProperty("PId"));
+                            parameters.put("PId2", n2.getProperty("PId"));
 
-                        //System.out.println("N222222 -->  " + n2.getProperty("firstAuthor"));
-
-                        Result result = db.execute(queryString, parameters);
-                        if (result.hasNext()) {
-                            Integer distance = (Integer) result.next().get("length(p)");
-                            //System.out.println(distance);
-                            if (distance != null && distance < threshold) {
-                                //System.out.println("YES threshold");
-                                if (n2.hasProperty("authorId")) {
-                                    //System.out.println("YES has authorId");
-                                    Integer i = (Integer) n2.getProperty("authorId");
-                                    if (i != authorId) {
-                                        //System.out.println("YES diffrent");
-                                        ResourceIterator<Node> nodesToEdit = db.findNodes(DynamicLabel.label("publication"), "authorId", i);
-                                        while (nodesToEdit.hasNext()) {
-                                            Node next = nodesToEdit.next();
-                                            next.setProperty("authorId", authorId);
-                                            System.out.println("EDIT -->  " + next.getProperty("firstAuthor") + " --> " + next.getProperty("authorId"));
+                            //System.out.println("N222222 -->  " + n2.getProperty("firstAuthor"));
+                            Result result1 = db.execute(query1, parameters);
+                            Result result2 = db.execute(query2, parameters);
+                            Result result3 = db.execute(query3, parameters);
+                            if (result1.hasNext()) {
+                                Long distance1 = (Long) result1.next().get("length(p)");
+                                //System.out.println(distance);
+                                if (distance1 != null && distance1 < threshold) {
+                                    System.out.println("Distance 1");
+                                    if (n2.hasProperty("authorId")) {
+                                        //System.out.println("YES has authorId");
+                                        Integer i = (Integer) n2.getProperty("authorId");
+                                        if (i != authorId) {
+                                            //System.out.println("YES diffrent");
+                                            ResourceIterator<Node> nodesToEdit = db.findNodes(Label.label("publication"), "authorId", i);
+                                            while (nodesToEdit.hasNext()) {
+                                                Node next = nodesToEdit.next();
+                                                next.setProperty("authorId", authorId);
+                                                System.out.println("EDIT -->  " + next.getProperty("firstAuthor") + " --> " + next.getProperty("authorId"));
+                                            }
+                                        }
+                                    } else {
+                                        n2.setProperty("authorId", authorId);
+                                    }
+                                } else if (result2.hasNext() && result3.hasNext()) {
+                                    Long distance2 = (Long) result2.next().get("length(p)");
+                                    Long distance3 = (Long) result3.next().get("length(p)");
+                                    if (distance2 != null && distance3 != null) {
+                                        if (distance2 < 3 && distance3 < 3) {
+                                            System.out.println("Distance 2 & 3");
+                                            if (n2.hasProperty("authorId")) {
+                                                //System.out.println("YES has authorId");
+                                                Integer i = (Integer) n2.getProperty("authorId");
+                                                if (i != authorId) {
+                                                    //System.out.println("YES diffrent");
+                                                    ResourceIterator<Node> nodesToEdit = db.findNodes(Label.label("publication"), "authorId", i);
+                                                    while (nodesToEdit.hasNext()) {
+                                                        Node next = nodesToEdit.next();
+                                                        next.setProperty("authorId", authorId);
+                                                        System.out.println("EDIT -->  " + next.getProperty("firstAuthor") + " --> " + next.getProperty("authorId"));
+                                                    }
+                                                }
+                                            } else {
+                                                n2.setProperty("authorId", authorId);
+                                            }
                                         }
                                     }
-                                } else {
-                                    n2.setProperty("authorId", authorId);
                                 }
                             }
                         }
@@ -398,7 +423,7 @@ public class Disambiguation {
             while ((availalbe = br.readLine()) != null) {
                 String next = availalbe;
                 String[] parts = next.split(";");
-                ResourceIterator<Node> result = db.findNodes(DynamicLabel.label("publication"), "PId", parts[0]);
+                ResourceIterator<Node> result = db.findNodes(Label.label("publication"), "PId", parts[0]);
                 if (result.hasNext()) {
                     count++;
                     Node node = result.next();
@@ -420,56 +445,18 @@ public class Disambiguation {
         }
     }
 
-    public static void selectPubEvaluation() throws FileNotFoundException, UnsupportedEncodingException, IOException {
-        BufferedReader br = new BufferedReader(new FileReader(new File("pubEvaluation.csv")));
-
-        String availalbe;
-        String line;
-        boolean write = false;
-        String type = null;
-        int count = 0;
-        PrintWriter out = new PrintWriter("pubDblpEva.xml", "ISO-8859-1");
-        while ((availalbe = br.readLine()) != null) {
-            //System.out.println("kkkkkkkkk");
-            String[] parts = availalbe.split(";");
-            BufferedReader brDblp = new BufferedReader(new FileReader(new File("dblp.xml")));
-            while ((line = brDblp.readLine()) != null) {
-                //System.out.println("mmmmmmmmm");
-                if (line.contains('"' + parts[1] + '"')) {
-                    System.out.println(count++);
-                    write = true;
-                    type = line.substring(1, line.indexOf(" "));
-                }
-                if (write) {
-                    out.println(line);
-                    //System.out.println(line);
-                }
-                if (line.contains("</" + type)) {
-                    write = false;
-                    type = null;
-                    brDblp.close();
-                    break;
-                }
-            }
-            brDblp.close();
-        }
-        out.close();
-        br.close();
-
-    }
-
     public static void main(String[] args) throws IOException {
         // TODO code application logic here
         //groupPublications();
 
         GraphDatabaseFactory dbFactory = new GraphDatabaseFactory();
-        File dbFile = new File("/home/houhaich/Documents/neo4j-community-3.1.4/data/databases/graph.db");
+        File dbFile = new File("/home/azmah/Desktop/thesis_IRIT/neo4j-community-3.1.4/data/databases/graph.db");
         GraphDatabaseService graphDb = dbFactory.newEmbeddedDatabase(dbFile);
 
         //createIndexes(graphDb);
         //createNodes2(graphDb);
-        graphDb.execute("MATCH (n) REMOVE n.authorId RETURN count(n)");
-        disambiguate(graphDb);
+        //graphDb.execute("MATCH (n) REMOVE n.authorId RETURN count(n)");
+        disambiguate2(graphDb, 5);
         //computeAccuracy(graphDb);
         //checkResults(graphDb);
         //selectPubEvaluation();
